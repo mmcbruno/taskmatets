@@ -1,10 +1,21 @@
 import React from 'react'
 import Head from 'next/head'
-import { ApolloProvide, ApolloClient , InMemoryCache, HttpLink} from '@apollo/client'
+import { ApolloProvider , ApolloClient , InMemoryCache, HttpLink} from '@apollo/client'
   
 import fetch from 'isomorphic-unfetch'
+import { NextPage } from 'next'
 
-let apolloClient = null
+type ApolloClientCache = any
+
+let apolloClient : ApolloClient<ApolloClientCache> = null
+
+interface WithApolloInitialProps{
+  apolloState? : ApolloClientCache
+}
+
+interface WithApolloProps extends WithApolloInitialProps{
+  apolloClient? : ApolloClient<ApolloClientCache>
+}
 
 /**
  * Creates and provides the apolloContext
@@ -14,12 +25,21 @@ let apolloClient = null
  * @param {Object} [config]
  * @param {Boolean} [config.ssr=true]
  */
-export function withApollo(PageComponent, { ssr = true } = {}) {
-  const WithApollo = ({ apolloClient, apolloState, ...pageProps }) => {
+export function withApollo<
+PageProps extends object, 
+PageInitialProps = PageProps>(PageComponent: NextPage<PageProps, PageInitialProps> , 
+  { ssr = true } = {}) {
+  
+  const WithApollo:NextPage<
+  PageProps & WithApolloProps, 
+  PageInitialProps & WithApolloInitialProps> = ({ 
+    apolloClient, 
+    apolloState, 
+    ...pageProps }) => {
     const client = apolloClient || initApolloClient(apolloState)
     return (
       <ApolloProvider client={client}>
-        <PageComponent {...pageProps} />
+        <PageComponent {...pageProps as PageProps} />
       </ApolloProvider>
     )
   }
@@ -45,7 +65,7 @@ export function withApollo(PageComponent, { ssr = true } = {}) {
       const apolloClient = (ctx.apolloClient = initApolloClient())
 
       // Run wrapped getInitialProps methods
-      let pageProps = {}
+      let pageProps = {} as PageInitialProps
       if (PageComponent.getInitialProps) {
         pageProps = await PageComponent.getInitialProps(ctx)
       }
@@ -102,7 +122,7 @@ export function withApollo(PageComponent, { ssr = true } = {}) {
  * Creates or reuses apollo client in the browser.
  * @param  {Object} initialState
  */
-function initApolloClient(initialState) {
+function initApolloClient(initialState? : ApolloClientCache) {
   // Make sure to create a new client for every server-side request so that data
   // isn't shared between connections (which would be bad)
   if (typeof window === 'undefined') {
@@ -121,12 +141,12 @@ function initApolloClient(initialState) {
  * Creates and configures the ApolloClient
  * @param  {Object} [initialState={}]
  */
-function createApolloClient(initialState = {}) {
+function createApolloClient(initialState? :ApolloClientCache) {
   // Check out https://github.com/zeit/next.js/pull/4611 if you want to use the AWSAppSyncClient
   return new ApolloClient({
     ssrMode: typeof window === 'undefined', // Disables forceFetch on the server (so queries are only run once)
     link: new HttpLink({
-      uri: 'https://api.graph.cool/simple/v1/cixmkt2ul01q00122mksg82pn', // Server URL (must be absolute)
+      uri: 'http://localhost:3001/graphql', // Server URL (must be absolute)
       credentials: 'same-origin', // Additional fetch() options like `credentials` or `headers`
       fetch,
     }),
